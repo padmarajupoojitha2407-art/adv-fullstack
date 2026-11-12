@@ -16,7 +16,7 @@ app.add_middleware(
 )
 
 
-# E1 - Register Package
+# E1 
 @app.post("/packages")
 def add_package(package_name: str, destination: str,
                 weight: float, arrival_date: date):
@@ -29,7 +29,7 @@ def add_package(package_name: str, destination: str,
 
 
 
-# E2 - Get Specific Package
+# E2 
 @app.get("/packages/{package_id}")
 def get_package(package_id: int, token = Header(None)):
     username = function.verify_token(token=token)
@@ -41,7 +41,7 @@ def get_package(package_id: int, token = Header(None)):
     return response
 
 
-# E3 - Update Package
+# E3 
 @app.patch("/packages/{package_id}")
 def update_package(package_id: int, package_name: str = None,
                    destination: str = None, weight: float = None,
@@ -57,7 +57,7 @@ def update_package(package_id: int, package_name: str = None,
     return result
 
 
-# E4 - Delete Package
+# E4 
 @app.delete("/packages/{package_id}")
 def delete_package(package_id: int):
 
@@ -72,7 +72,7 @@ def delete_package(package_id: int):
     return result
 
 
-# E5 - Filter Packages
+# E5 
 @app.get("/packages")
 def filter_packages(destination: str = None, status: str = None):
 
