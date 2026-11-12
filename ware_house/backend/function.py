@@ -1,6 +1,6 @@
 from sqlalchemy import Integer, String, Column, create_engine, Float, Date, ForeignKey
 from sqlalchemy.orm import Session, declarative_base
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 import jwt
 
 DB_PATH = "warehouse.db"
@@ -16,143 +16,126 @@ USERNAME = "Poojitha"
 PASSWORD = "123"
 
 
-ACCESS_TOKEN_EXPIRY = 15 #* 60  # 15 minutes in seconds
+ACCESS_TOKEN_EXPIRY = 1 #mins
+REFRESH_TOKEN_EXPIRY = 7*24*60 #mins (7 days)
 SECRET_KEY = "SECRET123"
 ALGORITHM = "HS256"
 
 
+Base = declarative_base()
 
 
-# Table 1: Packages
 class Packages(Base):
-
     __tablename__ = "packages"
-
     id = Column(Integer, primary_key=True)
     package_name = Column(String)
     destination = Column(String)
     weight = Column(Float)
     arrival_date = Column(Date)
     status = Column(String, default="pending")
-    dispatch_id = Column(Integer, ForeignKey("dispatches.id"), nullable=True)
+    dispatch_batch_id = Column(Integer, ForeignKey("dispatch_batches.id"), nullable=True)
 
-
-# Table 2: Dispatches
-class Dispatches(Base):
-
-    __tablename__ = "dispatches"
-
+class DispatchBatches(Base):
+    __tablename__ = "dispatch_batches"
     id = Column(Integer, primary_key=True)
     destination = Column(String)
     vehicle = Column(String)
     dispatch_status = Column(String, default="pending")
-
+    dispatch_date = Column(Date, nullable=True)
 
 Base.metadata.create_all(engine)
 
+def package_details(package):
+    return {
+        "id": package.id,
+        "package_name": package.package_name,
+        "destination": package.destination,
+        "weight": package.weight,
+        "arrival_date": str(package.arrival_date),
+        "status": package.status,
+        "dispatch_batch_id": package.dispatch_batch_id
+    }
 
-
-
-# E1 - Register Package
-
+# E1
 def add_package(package_name, destination, weight, arrival_date):
-
     session = Session(engine)
-
     package = Packages(
         package_name=package_name,
         destination=destination,
         weight=weight,
-        arrival_date=arrival_date
+        arrival_date=date.fromisoformat(arrival_date),
+        status="pending"
     )
-
     session.add(package)
     session.commit()
+    session.refresh(package)
+    response = package_details(package)
     session.close()
+    return response
 
-    return "Package added successfully"
-
-
-
-
-# E2 - Get Specific Package
+# E2
 def get_package(package_id):
     session = Session(engine)
-
     package = session.get(Packages, package_id)
-    session.close()
-
     if package is None:
-        return "not_found"
+        session.close()
+        return None
+    response = package_details(package)
+    session.close()
+    return response
 
-    return package
-
-
-# E3 - Update Package
-def update_package(package_id, package_name, destination, weight, arrival_date):
+# E3
+def update_package(package_id, data):
     session = Session(engine)
-
     package = session.get(Packages, package_id)
-
     if package is None:
         session.close()
         return "not_found"
-
-    if package_name is not None:
-        package.package_name = package_name
-
-    if destination is not None:
-        package.destination = destination
-
-    if weight is not None:
-        package.weight = weight
-
-    if arrival_date is not None:
-        package.arrival_date = arrival_date
-
-    session.commit()
-    session.close()
-
-    return "Package updated successfully"
-
-
-# E4 - Delete Package
-def delete_package(package_id):
-    session = Session(engine)
-
-    package = session.get(Packages, package_id)
-
-    if package is None:
-        session.close()
-        return "not_found"
-
     if package.status == "dispatched":
         session.close()
-        return "dispatched"
+        return "already_dispatched"
+    if package.dispatch_batch_id is not None:
+        session.close()
+        return "already_assigned"
+    if "arrival_date" in data:
+        data["arrival_date"] = date.fromisoformat(data["arrival_date"])
+    for key, value in data.items():
+        setattr(package, key, value)
+    session.commit()
+    response = package_details(package)
+    session.close()
+    return response
 
+# E4
+def delete_package(package_id):
+    session = Session(engine)
+    package = session.get(Packages, package_id)
+    if package is None:
+        session.close()
+        return "not_found"
+    if package.status == "dispatched":
+        session.close()
+        return "already_dispatched"
     session.delete(package)
     session.commit()
     session.close()
+    return "deleted"
 
-    return "Package deleted successfully"
-
-
-# E5 - Filter Packages
-def filter_packages(destination, status):
+# E5
+def get_all_packages(destination=None, status=None, arrival_date=None):
     session = Session(engine)
-
-    query = session.query(Packages)
-
-    if destination is not None:
-        query = query.filter(Packages.destination == destination)
-
-    if status is not None:
-        query = query.filter(Packages.status == status)
-
-    packages = query.all()
+    packages = session.query(Packages)
+    if destination:
+        packages = packages.filter(Packages.destination == destination)
+    if status:
+        packages = packages.filter(Packages.status == status)
+    if arrival_date:
+        arrival_date = date.fromisoformat(arrival_date)
+        packages = packages.filter(Packages.arrival_date == arrival_date)
+    response = [package_details(p) for p in packages.all()]
     session.close()
+    return response
 
-    return packages
 
 
 
@@ -183,23 +166,32 @@ def filter_packages(destination, status):
 
 def verify_login(username, password):
     if username ==USERNAME and password == PASSWORD:
-        token = create_token(username=username)
-        return token
-    return False
-
-def create_token(username):
+        access_token = create_token(username=username, token_type="access")
+        refresh_token = create_token(username=username, token_type="refresh")
+        return {"access_token": access_token, "refresh_token": refresh_token}
+    return None
+        
+def create_token(username, token_type):
+    time = ACCESS_TOKEN_EXPIRY
+    if token_type == "refresh":
+        time = REFRESH_TOKEN_EXPIRY
     payload ={
         "username": username,
-        "exp": datetime.now() + timedelta(minutes=ACCESS_TOKEN_EXPIRY)
+        "token_type": token_type,
+        "exp": datetime.now(timezone.utc) + timedelta(minutes=time)
     }
     token = jwt.encode(payload=payload, key=SECRET_KEY, algorithm=ALGORITHM)
     return token
 
-def verify_token(token):
+def verify_token(token, token_type):
     try:
-        payload = jwt.decode(token, key=SECRET_KEY, algorithms=[ALGORITHM])
-        return payload["username"]
+        payload = jwt.decode(jwt=token, key=SECRET_KEY, algorithms=[ALGORITHM])
+
     except:
         return False
+    if payload["token_type"] == token_type:
+        return payload["username"]
+    
+    return False
 
     
