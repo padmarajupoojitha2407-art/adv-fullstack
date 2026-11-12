@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Body, Header
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import date
 
@@ -31,14 +31,14 @@ def add_package(package_name: str, destination: str,
 
 # E2 - Get Specific Package
 @app.get("/packages/{package_id}")
-def get_package(package_id: int):
-
-    result = function.get_package(package_id)
-
-    if result == "not_found":
+def get_package(package_id: int, token = Header(None)):
+    username = function.verify_token(token=token)
+    if not username:
+        raise HTTPException(status_code = 401, detail = "Invalid or expiry token")
+    response = function.get_package(package_id)
+    if response is None:
         raise HTTPException(status_code=404, detail="Package not found")
-
-    return result
+    return response
 
 
 # E3 - Update Package
@@ -123,5 +123,14 @@ def login (username: str, password: str):
     token = function.verify_login(username=username, password=password)
     if token is None:
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return{"token": token}
-    
+    return token
+
+@app.post("/refresh")
+def refresh_token(refresh_token = Header(None)):
+    username = function.verify_token(token=refresh_token, token_type="refresh")
+    if not username:
+        raise HTTPException(status_code = 401, detail = "Invalid or expired refresh token")
+    access_token = function.create_token(username=username, token_type="access")
+    return {"access_token": access_token}
+
+
