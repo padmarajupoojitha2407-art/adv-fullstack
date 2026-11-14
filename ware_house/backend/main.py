@@ -8,6 +8,39 @@ import function
 
 app = FastAPI()
 
+USER_TYPE = ["admin", "manager", "staff"]
+
+def check_role(token, allowed_roles):
+    username = function.verify_token(
+        token=token,
+        token_type="access"
+    )
+
+    if not username:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token"
+        )
+
+    user_type = function.get_user_role(token)
+
+    if not user_type:
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid or expired token"
+        )
+
+    if user_type not in allowed_roles:
+        raise HTTPException(
+            status_code=403,
+            detail="Permission denied"
+        )
+
+
+
+
+
+
 
 class PackageCreate(BaseModel):
     package_name: str = Field(min_length=1)
@@ -32,6 +65,7 @@ class DispatchCreate(BaseModel):
 class UserIn(BaseModel):
     username: str = Field(min_length=1)
     password: str = Field(min_length=1)
+    user_type: str 
 
 
 app.add_middleware(
@@ -45,10 +79,7 @@ app.add_middleware(
 # E1 
 @app.post("/packages")
 def add_package(package: PackageCreate, token = Header(None)):
-    username = function.verify_token(token=token,  token_type = "access")
-    if not username:
-        raise HTTPException(status_code = 401, detail = "Invalid or expiry token")
-
+    check_role(token,["admin", "manager"])
     return function.add_package(
         package.package_name, package.destination, package.weight, package.arrival_date
     )
@@ -58,9 +89,7 @@ def add_package(package: PackageCreate, token = Header(None)):
 # E2 
 @app.get("/packages/{package_id}")
 def get_package(package_id: int, token = Header(None)):
-    username = function.verify_token(token=token, token_type="access")
-    if not username:
-        raise HTTPException(status_code = 401, detail = "Invalid or expiry token")
+    check_role(token,["admin", "manager", "staff"])
     response = function.get_package(package_id)
     if response is None:
         raise HTTPException(status_code=404, detail="Package not found")
@@ -72,10 +101,7 @@ def get_package(package_id: int, token = Header(None)):
 @app.patch("/packages/{package_id}")
 def update_package(package_id: int, package: PackageUpdate, token=Header(None)):
 
-    username = function.verify_token(token=token, token_type="access")
-    if not username:
-        raise HTTPException(status_code=401, detail="Invalid or expiry token")
-
+    check_role(token,["admin", "manager", "staff"])
     # only the fields the user actually sent
     result = function.update_package(package_id, package.model_dump(exclude_unset=True))
 
@@ -96,9 +122,7 @@ def update_package(package_id: int, package: PackageUpdate, token=Header(None)):
 @app.delete("/packages/{package_id}")
 def delete_package(package_id: int, token = Header(None)):
 
-    username = function.verify_token(token=token, token_type="access")
-    if not username:
-        raise HTTPException(status_code = 401, detail = "Invalid or expiry token")
+    check_role(token,["admin", "manager"])
 
     result = function.delete_package(package_id)
 
@@ -115,9 +139,7 @@ def delete_package(package_id: int, token = Header(None)):
 @app.get("/packages")
 def filter_packages(destination: str = None, status: str = None, token = Header(None)):
 
-    username = function.verify_token(token=token, token_type="access")
-    if not username:
-        raise HTTPException(status_code = 401, detail = "Invalid or expiry token")
+    check_role(token,["admin", "manager", "staff"])
 
     return function.filter_packages(destination, status)
 
@@ -127,19 +149,14 @@ def filter_packages(destination: str = None, status: str = None, token = Header(
 def get_dispatch(destination: str = None, vehicle: str = None,
                    status: str = None, token = Header(None)):
 
-    username = function.verify_token(token=token, token_type="access")
-    if not username:
-        raise HTTPException(status_code = 401, detail = "Invalid or expiry token")
-
+    check_role(token,["admin", "manager", "staff"])
     return function.get_dispatch(destination, vehicle, status)
 
 
 #E7
 @app.get("/analytics") 
 def get_analytics(token = Header(None)):
-    username = function.verify_token(token=token, token_type="access")
-    if not username:
-        raise HTTPException(status_code = 401, detail = "Invalid or expiry token")
+    check_role(token,["admin", "manager", "staff"])
     return function.get_warehouse_statistics()
 
 
@@ -147,9 +164,7 @@ def get_analytics(token = Header(None)):
 @app.post("/dispatches")
 def add_dispatch(dispatch: DispatchCreate, token = Header(None)):
 
-    username = function.verify_token(token=token, token_type="access")
-    if not username:
-        raise HTTPException(status_code = 401, detail = "Invalid or expiry token")
+    check_role(token,["admin", "manager", "staff"])
 
     result = function.add_dispatch(dispatch.destination, dispatch.vehicle, dispatch.package_ids)
 
@@ -213,8 +228,8 @@ def add_dispatch(dispatch: DispatchCreate, token = Header(None)):
 
 #tokens
 @app.post("/login")
-def login (user: UserIn):
-    token = function.verify_login(username=user.username, password=user.password)
+def login (username, password):
+    token = function.verify_login(username=username, password=password)
     if not token:
         raise HTTPException(status_code=401, detail="Invalid credentials")
     return token
@@ -230,7 +245,9 @@ def refresh_token(refresh_token = Header(None)):
 
 @app.post("/register")
 def register_user(user: UserIn):
-    if function.register_User(username=user.username, password=user.password):
+    if user.user_type not in USER_TYPE:
+        raise HTTPException(status_code= 400, detail = "user_type must be admin , staff or manager")
+    if function.register_User(username=user.username, password=user.password, user_type = user.user_type):
         return {"message": "User registered successfully"}
     raise HTTPException(status_code=400, detail="User already exists:")
 
