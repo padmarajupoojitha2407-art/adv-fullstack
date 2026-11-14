@@ -2,7 +2,6 @@ from fastapi import FastAPI, HTTPException, Header
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import date
 from pydantic import BaseModel, Field
-
 import function
 
 
@@ -11,33 +10,16 @@ app = FastAPI()
 USER_TYPE = ["admin", "manager", "staff"]
 
 def check_role(token, allowed_roles):
-    username = function.verify_token(
-        token=token,
-        token_type="access"
-    )
-
+    username = function.verify_token( token=token, token_type="access")
     if not username:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired token"
-        )
-
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
     user_type = function.get_user_role(token)
 
     if not user_type:
-        raise HTTPException(
-            status_code=401,
-            detail="Invalid or expired token"
-        )
+        raise HTTPException(status_code=401, detail="Invalid or expired token")
 
     if user_type not in allowed_roles:
-        raise HTTPException(
-            status_code=403,
-            detail="Permission denied"
-        )
-
-
-
+        raise HTTPException(status_code=403, detail="Permission denied")
 
 
 
@@ -80,9 +62,7 @@ app.add_middleware(
 @app.post("/packages")
 def add_package(package: PackageCreate, token = Header(None)):
     check_role(token,["admin", "manager"])
-    return function.add_package(
-        package.package_name, package.destination, package.weight, package.arrival_date
-    )
+    return function.add_package(package.package_name, package.destination, package.weight, package.arrival_date)
 
 
 
@@ -146,8 +126,7 @@ def filter_packages(destination: str = None, status: str = None, token = Header(
 
 # E6 
 @app.get("/dispatches")
-def get_dispatch(destination: str = None, vehicle: str = None,
-                   status: str = None, token = Header(None)):
+def get_dispatch(destination: str = None, vehicle: str = None, status: str = None, token = Header(None)):
 
     check_role(token,["admin", "manager", "staff"])
     return function.get_dispatch(destination, vehicle, status)
@@ -169,22 +148,13 @@ def add_dispatch(dispatch: DispatchCreate, token = Header(None)):
     result = function.add_dispatch(dispatch.destination, dispatch.vehicle, dispatch.package_ids)
 
     if result == "not_found":
-        raise HTTPException(
-            status_code=404,
-            detail="One or more packages not found"
-        )
+        raise HTTPException(status_code=404, detail="One or more packages not found" )
 
     if result == "already_dispatched":
-        raise HTTPException(
-            status_code=400,
-            detail="One or more packages are already dispatched"
-        )
+        raise HTTPException(status_code=400, detail="One or more packages are already dispatched")
 
     if result == "invalid_destination":
-        raise HTTPException(
-            status_code=400,
-            detail="Package destination does not match dispatch destination"
-        )
+        raise HTTPException(status_code=400, detail="Package destination does not match dispatch destination")
 
     return result
 
