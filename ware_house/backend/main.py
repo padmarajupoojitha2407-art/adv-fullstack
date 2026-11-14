@@ -193,39 +193,6 @@ def add_dispatch(dispatch: DispatchCreate, token = Header(None)):
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #tokens
 @app.post("/login")
 def login (username, password):
