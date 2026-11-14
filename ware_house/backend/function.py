@@ -15,8 +15,6 @@ Base = declarative_base()
 WAREHOUSE_MODULES = ["Packages", "Dispatch", "Analytics"]
 
 
-
-
 USERNAME = "Poojitha"
 PASSWORD = "123"
 
@@ -58,10 +56,7 @@ class User(Base):
     user_type = Column(String, default="staff")
     
 
-    
-    
-    
-    
+      
 
 
 Base.metadata.create_all(engine)
@@ -227,13 +222,9 @@ def add_dispatch(destination, vehicle, package_ids):
 
         packages.append(package)
 
-    dispatch = DispatchBatches(
-        destination=destination,
-        vehicle=vehicle,
-        dispatch_status="dispatched"
-    )
+    dispatch = DispatchBatches(destination=destination, vehicle=vehicle, dispatch_status="dispatched")
     session.add(dispatch)
-    session.flush()  # gives dispatch.id before the single commit
+    session.flush()  
 
     for package in packages:
         package.status = "dispatched"
@@ -261,25 +252,6 @@ def filter_packages(destination=None, status=None):
     session.close()
 
     return packages
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
