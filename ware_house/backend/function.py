@@ -15,8 +15,6 @@ Base = declarative_base()
 WAREHOUSE_MODULES = ["Packages", "Dispatch", "Analytics"]
 
 
-
-
 USERNAME = "Poojitha"
 PASSWORD = "123"
 
@@ -58,10 +56,7 @@ class User(Base):
     user_type = Column(String, default="staff")
     
 
-    
-    
-    
-    
+      
 
 
 Base.metadata.create_all(engine)
@@ -261,25 +256,6 @@ def filter_packages(destination=None, status=None):
     session.close()
 
     return packages
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
