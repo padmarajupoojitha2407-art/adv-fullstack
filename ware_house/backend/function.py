@@ -222,13 +222,9 @@ def add_dispatch(destination, vehicle, package_ids):
 
         packages.append(package)
 
-    dispatch = DispatchBatches(
-        destination=destination,
-        vehicle=vehicle,
-        dispatch_status="dispatched"
-    )
+    dispatch = DispatchBatches(destination=destination, vehicle=vehicle, dispatch_status="dispatched")
     session.add(dispatch)
-    session.flush()  # gives dispatch.id before the single commit
+    session.flush()  
 
     for package in packages:
         package.status = "dispatched"
