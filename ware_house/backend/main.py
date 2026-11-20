@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Header
+from fastapi import FastAPI, HTTPException, Header, Body
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import date
 from pydantic import BaseModel, Field
@@ -165,7 +165,7 @@ def add_dispatch(dispatch: DispatchCreate, token = Header(None)):
 
 #tokens
 @app.post("/login")
-def login (username, password):
+def login (username=Body(), password=Body()):
     token = function.verify_login(username=username, password=password)
     if not token:
         raise HTTPException(status_code=401, detail="Invalid credentials")
